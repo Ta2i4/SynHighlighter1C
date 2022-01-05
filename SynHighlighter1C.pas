@@ -113,7 +113,6 @@ type
     procedure SetProcNames(const Value: TStrings);
   protected
     function IsFilterStored: Boolean; override;
-    //function GetSampleSource: string; override;
   public
     class function GetLanguageName: string; override;
     class function GetFriendlyLanguageName: string; override;
@@ -190,75 +189,15 @@ const
     'КОГДА,КОНЕЦ,ЛЕВОЕ,НЕ,ОБЪЕДИНИТЬ,ПЕРВЫЕ,ПО,ПОЛНОЕ,ПРАВОЕ,РАЗЛИЧНЫЕ,' +
     'РАЗРЕШЕННЫЕ,СГРУППИРОВАТЬ,СОЕДИНЕНИЕ,ССЫЛКА,ТИП,ТИПЗНАЧЕНИЯ,ТОГДА' +
     'УПОРЯДОЧИТЬ';
-//ниже mssql
-    {'ADD,ALL,ALTER,ANY,ASC,AUTHORIZATION,BACKUP,' +
-    'BEGIN,BETWEEN,BREAK,BROWSE,BULK,CASCADE,' +
-    'CHECK,CHECKPOINT,CLOSE,CLUSTERED,COLLATE,' +
-    'COLUMN,COMMIT,COMPUTE,CONSTRAINT,CONTAINS,CONTAINSTABLE,' +
-    'CONTINUE,CREATE,CROSS,CURRENT,CURSOR,DATABASE,' +
-    'DBCC,DEALLOCATE,DECLARE,DEFAULT,DELETE,DENY,DESC,DISK,' +
-    'DISTINCT,DISTRIBUTED,DOUBLE,DROP,DUMMY,DUMP,' +
-    'ERRLVL,ESCAPE,EXCEPT,EXEC,EXECUTE,EXISTS,EXIT,FETCH,FILE,' +
-    'FILLFACTOR,FOREIGN,FORMSOF,FREETEXT,FREETEXTTABLE,' +
-    'FUNCTION,GOTO,GRANT,HOLDLOCK,IDENTITY,' +
-    'IDENTITYCOL,IDENTITY_INSERT,IN,INFLECTIONAL,INDEX,INNER,INSERT,' +
-    'INTERSECT,INTO,IS,ISABOUT,JOIN,KEY,KILL,LINENO,LOAD,' +
-    'NATIONAL,NOCHECK,NONCLUSTERED,OFF,' +
-    'OFFSETS,ON,OPEN,OPENDATASOURCE,OPENQUERY,OPENROWSET,OPENXML,' +
-    'OPTION,OUTER,OVER,PERCENT,PLAN,PRECISION,' +
-    'PRIMARY,PRINT,PROC,PROCEDURE,PUBLIC,RAISERROR,READ,' +
-    'READTEXT,RECONFIGURE,REFERENCES,REPLICATION,RESTORE,' +
-    'RESTRICT,RETURN,REVOKE,ROLLBACK,ROWCOUNT,ROWGUIDCOL,' +
-    'RULE,SAVE,SCHEMA,SESSION_USER,SET,SETUSER,SHUTDOWN,' +
-    'SOME,STATISTICS,TABLE,TEXTSIZE,TO,TOP,TRAN,TRANSACTION,' +
-    'TRIGGER,TRUNCATE,TSEQUAL,UPDATE,UPDATETEXT,' +
-    'USE,USER,VALUES,VARYING,VIEW,WAITFOR,WEIGHT,WHILE,' +
-    'WITH,WRITETEXT'}
 
 //---1C functions---------------------------------------------------------------
-//исправить - пока это mssql
   ONESFunctions: string =
     'ISNULL,ВОЗР,ГОД,ДЕНЬ,ДОБАВИТЬКДАТЕ,ЕСТЬNULL,КВАРТАЛ,КОЛИЧЕСТВО,МАКСИМУМ,' +
-    'МЕСЯЦ,МИНИМУМ,МИНУТА,РАЗНЫХ,СЕКУНДА,СРЕДНЕЕ,СУММА,УБЫВ,ЧАС'
-    {'@@CONNECTIONS,@@CPU_BUSY,@@CURSOR_ROWS,@@DATEFIRST,@@DBTS,@@ERROR,' +
-    '@@FETCH_STATUS,@@IDENTITY,@@IDLE,@@IO_BUSY,@@LANGID,@@LANGUAGE,' +
-    '@@LOCK_TIMEOUT,@@MAX_CONNECTIONS,@@MAX_PRECISION,@@NESTLEVEL,@@OPTIONS,' +
-    '@@PACKET_ERRORS,@@PACK_RECEIVED,@@PACK_SENT,@@PROCID,@@REMSERVER,' +
-    '@@ROWCOUNT,@@SERVERNAME,@@SERVICENAME,@@SPID,@@TEXTSIZE,@@TIMETICKS,' +
-    '@@TOTAL_ERRORS,@@TOTAL_READ,@@TOTAL_WRITE,@@TRANCOUNT,@@VERSION,' +
-    'ABS,ACOS,APP_NAME,ASCII,ASIN,ATAN,ATN2,AVG,BINARY_CHECKSUM,CAST,' +
-    'CEILING,CHARINDEX,CHECKSUM,CHECKSUM_AGG,COALESCE,COLLATIONPROPERTY,' +
-    'COLUMNPROPERTY,COL_LENGTH,COL_NAME,CONVERT,COS,COT,COUNT,' +
-    'COUNT_BIG,CURRENT_DATE,CURRENT_TIME,CURRENT_TIMESTAMP,' +
-    'CURRENT_USER,CURSOR_STATUS,DATABASEPROPERTY,DATABASEPROPERTYEX,' +
-    'DATALENGTH,DATEADD,DATEDIFF,DATENAME,DATEPART,DAY,DB_ID,DB_NAME,DEGREES,' +
-    'DIFFERENCE,EXP,FILEGROUPPROPERTY,FILEGROUP_ID,FILEGROUP_NAME,' +
-    'FILEPROPERTY,FILE_ID,FILE_NAME,FLOOR,fn_helpcollations,' +
-    'fn_listextendedproperty,fn_servershareddrives,fn_trace_geteventinfo,' +
-    'fn_trace_getfilterinfo,fn_trace_getinfo,fn_trace_gettable,' +
-    'fn_virtualfilestats,FORMATMESSAGE,FULLTEXTCATALOGPROPERTY,' +
-    'FULLTEXTSERVICEPROPERTY,GETANSINULL,GETDATE,GETUTCDATE,GROUPING,' +
-    'HAS_DBACCESS,HOST_ID,HOST_NAME,IDENT_CURRENT,IDENT_INCR,IDENT_SEED,' +
-    'INDEXKEY_PROPERTY,INDEXPROPERTY,INDEX_COL,ISDATE,ISNULL,ISNUMERIC,' +
-    'IS_MEMBER,IS_SRVROLEMEMBER,LEN,LOG,LOG10,LOWER,LTRIM,MAX,MIN,MONTH,' +
-    'NEWID,OBJECTPROPERTY,OBJECT_ID,OBJECT_NAME,PARSENAME,PATINDEX,' +
-    'PERMISSIONS,PI,POWER,QUOTENAME,RADIANS,RAND,REPLACE,REPLICATE,REVERSE,' +
-    'ROUND,ROWCOUNT_BIG,RTRIM,SCOPE_IDENTITY,SERVERPROPERTY,SESSIONPROPERTY,' +
-    'SIGN,SIN,SOUNDEX,SPACE,SQL_VARIANT_PROPERTY,SQRT,SQUARE,' +
-    'STATS_DATE,STDEV,STDEVP,STR,STUFF,SUBSTRING,SUM,SUSER_SID,SUSER_SNAME,' +
-    'SYSTEM_USER,TAN,TEXTPTR,TEXTVALID,TYPEPROPERTY,UNICODE,UPPER,' +
-    'USER_ID,USER_NAME,VAR,VARP,YEAR'};
+    'МЕСЯЦ,МИНИМУМ,МИНУТА,РАЗНЫХ,СЕКУНДА,СРЕДНЕЕ,СУММА,УБЫВ,ЧАС';
 
 //---1C types-------------------------------------------------------------------
-//исправить - пока это mssql
   ONESTypes: string =
-    'СТРОКА,ЧИСЛО'
-    {'bigint,binary,bit,char,character,datetime,' +
-    'dec,decimal,float,image,int,' +
-    'integer,money,nchar,ntext,numeric,nvarchar,real,' +
-    'rowversion,smalldatetime,smallint,smallmoney,' +
-    'sql_variant,sysname,text,timestamp,tinyint,uniqueidentifier,' +
-    'varbinary,varchar'};
+    'СТРОКА,ЧИСЛО';
 
 function TSyn1CSyn.HashKey(Str: PWideChar): Integer;
 var
@@ -914,37 +853,6 @@ procedure TSyn1CSyn.SetProcNames(const Value: TStrings);
 begin
   fProcNames.Assign(Value);
 end;
-
-{procedure TSynSQLSyn.SetDialect(Value: TSQLDialect);
-begin
-  if (Value <> fDialect) then
-  begin
-    fDialect := Value;
-    >>>>>>>!!!!!>>>>>>> InitializeKeywordLists; - добавить если ссылается
-  end;
-end;}
-
-//function TSyn1CSyn.GetSampleSource: string;
-//begin
-//  Result := '';
-  {Result := '/* SQL Server2000 example source */'#13#10 +
-        'SET QUOTED_IDENTIFIER ON'#13#10 +
-        'GO'#13#10 +
-        'SET ANSI_NULLS OFF'#13#10 +
-        'GO'#13#10 +
-        #13#10 +
-        '/* Object:  Stored Procedure dbo.sp_PPQInsertOrder */'#13#10 +
-        'CREATE PROCEDURE sp_PPQInsertOrder'#13#10 +
-        '  @Name    varchar(25),'#13#10 +
-        '  @Address varchar(255),'#13#10 +
-        '  @ZipCode varchar(15)'#13#10 +
-        'AS'#13#10 +
-        '  INSERT INTO PPQOrders(Name, Address, ZipCode, OrderDate)'#13#10 +
-        '  VALUES (@Name, @Address, @ZipCode, GetDate())'#13#10 +
-        #13#10 +
-        '  SELECT SCOPE_IDENTITY()'#13#10 +
-        'GO';}
-//end;
 
 class function TSyn1CSyn.GetFriendlyLanguageName: string;
 begin
