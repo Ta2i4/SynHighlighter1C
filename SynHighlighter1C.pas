@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.1.1 (2022/01/06)
+File version: v.0.1.2.3 (2022/01/07)
 
 All Rights Reserved.
 }
@@ -114,9 +114,6 @@ type
   protected
     function IsFilterStored: Boolean; override;
   public
-    class function GetLanguageName: string; override;
-    class function GetFriendlyLanguageName: string; override;
-  public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
@@ -191,6 +188,7 @@ const
     'УПОРЯДОЧИТЬ';
 
 //---1C functions---------------------------------------------------------------
+//исправить - пока это mssql
   ONESFunctions: string =
     'ISNULL,ВОЗР,ГОД,ДЕНЬ,ДОБАВИТЬКДАТЕ,ЕСТЬNULL,КВАРТАЛ,КОЛИЧЕСТВО,МАКСИМУМ,' +
     'МЕСЯЦ,МИНИМУМ,МИНУТА,РАЗНЫХ,СЕКУНДА,СРЕДНЕЕ,СУММА,УБЫВ,ЧАС';
@@ -361,8 +359,6 @@ begin
 end;
 
 procedure TSyn1CSyn.AsciiCharProc;
-var
-  IsEsc: Boolean;
 begin
   if fLine[Run] = #0 then NullProc else begin
     fTokenID := tkString;
@@ -754,11 +750,6 @@ begin
   end;
 end;
 
-class function TSyn1CSyn.GetLanguageName: string;
-begin
-  Result := SYNS_LangSQL;
-end;
-
 procedure TSyn1CSyn.DoAddKeyword(AKeyword: string; AKind: integer);
 var
   HashValue: Integer;
@@ -852,11 +843,6 @@ end;
 procedure TSyn1CSyn.SetProcNames(const Value: TStrings);
 begin
   fProcNames.Assign(Value);
-end;
-
-class function TSyn1CSyn.GetFriendlyLanguageName: string;
-begin
-  Result := SYNS_FriendlyLangSQL;
 end;
 
 function TSyn1CSyn.GetKeyWords(TokenKind: Integer): string;
