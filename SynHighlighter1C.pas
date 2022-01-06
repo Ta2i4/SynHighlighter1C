@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.2.3 (2022/01/07)
+File version: v.0.1.3.4 (2022/01/07)
 
 All Rights Reserved.
 }
@@ -111,8 +111,6 @@ type
     procedure PutProcNamesInKeywordList;
     procedure SetFunctionNames(const Value: TStrings);
     procedure SetProcNames(const Value: TStrings);
-  protected
-    function IsFilterStored: Boolean; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -735,11 +733,6 @@ end;
 procedure TSyn1CSyn.SetRange(Value: Pointer);
 begin
   fRange := TRangeState(Value);
-end;
-
-function TSyn1CSyn.IsFilterStored: Boolean;
-begin
-  Result := fDefaultFilter <> SYNS_FilterSQL;
 end;
 
 function TSyn1CSyn.IsIdentChar(AChar: WideChar): Boolean;
