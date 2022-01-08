@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.3.4 (2022/01/07)
+File version: v.0.1.4.5 (2022/01/08)
 
 All Rights Reserved.
 }
@@ -115,7 +115,6 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
-    function IsKeyword(const AKeyword: string): Boolean; override;
     procedure Next; override;
     function GetDefaultAttribute(Index: Integer): TSynHighlighterAttributes;
       override;
@@ -617,15 +616,6 @@ begin
       until IsLineEnd(Run);
     end;
   end;
-end;
-
-function TSyn1CSyn.IsKeyword(const AKeyword: string): Boolean;
-var
-  tk: TtkTokenKind;
-begin
-  tk := IdentKind(PWideChar(AKeyword));
-  Result := tk in [tkDatatype, tkException, tkFunction, tkKey, tkPLSQL,
-    tkDefaultPackage];
 end;
 
 procedure TSyn1CSyn.Next;
