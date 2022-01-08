@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.4.5 (2022/01/08)
+File version: v.0.1.4.6 (2022/01/08)
 
 All Rights Reserved.
 }
@@ -31,8 +31,7 @@ unit SynHighlighter1C;
 interface
 
 uses
-  System.Win.Registry, System.Generics.Collections, System.SysUtils,
-  System.Classes,
+  System.Generics.Collections, System.SysUtils, System.Classes,
   Vcl.Graphics,
   SynEditTypes, SynEditHighlighter, SynHighlighterHashEntries, SynUnicode;
 
