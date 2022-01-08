@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.4.6 (2022/01/08)
+File version: v.0.1.4.9 (2022/01/08)
 
 All Rights Reserved.
 }
@@ -182,13 +182,10 @@ const
     'КОГДА,КОНЕЦ,ЛЕВОЕ,НЕ,ОБЪЕДИНИТЬ,ПЕРВЫЕ,ПО,ПОЛНОЕ,ПРАВОЕ,РАЗЛИЧНЫЕ,' +
     'РАЗРЕШЕННЫЕ,СГРУППИРОВАТЬ,СОЕДИНЕНИЕ,ССЫЛКА,ТИП,ТИПЗНАЧЕНИЯ,ТОГДА' +
     'УПОРЯДОЧИТЬ';
-
 //---1C functions---------------------------------------------------------------
-//исправить - пока это mssql
   ONESFunctions: string =
     'ISNULL,ВОЗР,ГОД,ДЕНЬ,ДОБАВИТЬКДАТЕ,ЕСТЬNULL,КВАРТАЛ,КОЛИЧЕСТВО,МАКСИМУМ,' +
     'МЕСЯЦ,МИНИМУМ,МИНУТА,РАЗНЫХ,СЕКУНДА,СРЕДНЕЕ,СУММА,УБЫВ,ЧАС';
-
 //---1C types-------------------------------------------------------------------
   ONESTypes: string =
     'СТРОКА,ЧИСЛО';
