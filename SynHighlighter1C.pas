@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.1.4.9 (2022/01/08)
+File version: v.0.2.1.0 (2022/02/24)
 
 All Rights Reserved.
 }
@@ -32,8 +32,9 @@ interface
 
 uses
   System.Generics.Collections, System.SysUtils, System.Classes,
+  System.Generics.Defaults,
   Vcl.Graphics,
-  SynEditTypes, SynEditHighlighter, SynHighlighterHashEntries, SynUnicode;
+  SynEditTypes, SynEditHighlighter;
 
 type
   TtkTokenKind = (tkComment, tkDatatype, tkDefaultPackage, tkException,
@@ -49,10 +50,9 @@ type
   private
     fRange: TRangeState;
     fTokenID: TtkTokenKind;
-    fKeywords: TSynHashEntryList;
+    FKeywords: TDictionary<String, TtkTokenKind>;
     FProcNames: TStrings;
     fTableNames: TStrings;
-    FTableDict: TDictionary<string, Boolean>;
     fFunctionNames: TStrings;
     fCommentAttri: TSynHighlighterAttributes;
     fConditionalCommentAttri: TSynHighlighterAttributes;
@@ -73,7 +73,6 @@ type
     fTableNameAttri: TSynHighlighterAttributes;
     fProcNameAttri: TSynHighlighterAttributes;
     fVariableAttri: TSynHighlighterAttributes;
-    function HashKey(Str: PWideChar): Integer;
     function IdentKind(MayBe: PWideChar): TtkTokenKind;
     procedure AndSymbolProc;
     procedure AsciiCharProc;
@@ -110,6 +109,11 @@ type
     procedure PutProcNamesInKeywordList;
     procedure SetFunctionNames(const Value: TStrings);
     procedure SetProcNames(const Value: TStrings);
+  protected
+    function IsFilterStored: Boolean; override;
+  public
+    class function GetLanguageName: string; override;
+    class function GetFriendlyLanguageName: string; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -122,6 +126,7 @@ type
     function GetTokenAttribute: TSynHighlighterAttributes; override;
     function GetTokenID: TtkTokenKind;
     function GetTokenKind: Integer; override;
+    function IsKeyword(const AKeyword: string): Boolean; override;
     procedure ResetRange; override;
     procedure SetRange(Value: Pointer); override;
     function IsIdentChar(AChar: WideChar): Boolean; override;
@@ -172,6 +177,7 @@ type
 implementation
 
 uses
+  SynEditMiscProcs,
   SynEditStrConst;
 
 const
@@ -190,70 +196,30 @@ const
   ONESTypes: string =
     'СТРОКА,ЧИСЛО';
 
-function TSyn1CSyn.HashKey(Str: PWideChar): Integer;
-var
-  FoundDoubleMinus: Boolean;
-
-  function GetOrd: Integer;
-  begin
-    case Str^ of
-      '_': Result := 1;
-      'а'..'я': Result := 2 + Ord(Str^) - Ord('а');
-      'А'..'Я': Result := 2 + Ord(Str^) - Ord('А');
-      'a'..'z': Result := 2 + Ord(Str^) - Ord('a');
-      'A'..'Z': Result := 2 + Ord(Str^) - Ord('A');
-      '@': Result := 24;
-      else Result := 0;
-    end;
-  end;
-
-begin
-  Result := 0;
-  while IsIdentChar(Str^) do begin
-    FoundDoubleMinus := (Str^ = '-') and ((Str + 1)^ = '-');
-    if FoundDoubleMinus then Break;
-{$IFOPT Q-}
-    Result := 2 * Result + GetOrd;
-{$ELSE}
-    Result := (2 * Result + GetOrd) and $FFFFFF;
-{$ENDIF}
-    Inc(Str);
-  end;
-  Result := Result and $FF;
-  if Assigned(fToIdent) then fStringLen := Str - fToIdent
-    else fStringLen := 0;
-end;
-
 function TSyn1CSyn.IdentKind(MayBe: PWideChar): TtkTokenKind;
 var
-  Entry: TSynHashEntry;
+  S: String;
 begin
   fToIdent := MayBe;
-  Entry := fKeywords[HashKey(MayBe)];
-  while Assigned(Entry) do begin
-    if Entry.KeywordLen > fStringLen then Break
-      else if Entry.KeywordLen = fStringLen then
-        if IsCurrentToken(Entry.Keyword) then begin
-          Result := TtkTokenKind(Entry.Kind);
-          Exit;
-        end;
-    Entry := Entry.Next;
+  while IsIdentChar(MayBe^) do begin
+    if (MayBe^ = '-') and ((MayBe + 1)^ = '-') then Break;
+    Inc(Maybe);
   end;
-  if fTableDict.ContainsKey(AnsiLowerCase(Copy(StrPas(fToIdent), 1,
-    fStringLen)))
-    then Result := tkTableName else Result := tkIdentifier;
+  fStringLen := Maybe - fToIdent;
+  SetString(S, fToIdent, fStringLen);
+  if FKeywords.ContainsKey(S) then Result := FKeywords[S] 
+    else Result := tkIdentifier;
 end;
 
 constructor TSyn1CSyn.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   fCaseSensitive := False;
-  fKeywords := TSynHashEntryList.Create;
+  FKeywords := TDictionary<String, TtkTokenKind>.Create(TIStringComparer.Ordinal);
   FProcNames := TStringList.Create;
   TStringList(FProcNames).OnChange := ProcNamesChanged;
   fTableNames := TStringList.Create;
   TStringList(fTableNames).OnChange := TableNamesChanged;
-  FTableDict := TDictionary<string, Boolean>.Create;
   fFunctionNames := TStringList.Create;
   TStringList(fFunctionNames).OnChange := FunctionNamesChanged;
   fCommentAttri := TSynHighlighterAttributes.Create(SYNS_AttrComment,
@@ -331,10 +297,9 @@ end;
 
 destructor TSyn1CSyn.Destroy;
 begin
-  fKeywords.Free;
+  FKeywords.Free;
   fProcNames.Free;
   fTableNames.Free;
-  fTableDict.Free;
   fFunctionNames.Free;
   inherited Destroy;
 end;
@@ -614,6 +579,15 @@ begin
   end;
 end;
 
+function TSyn1CSyn.IsKeyword(const AKeyword: string): Boolean;
+var
+  tk: TtkTokenKind;
+begin
+  tk := IdentKind(PWideChar(AKeyword));
+  Result := tk in [tkDatatype, tkException, tkFunction, tkKey, tkPLSQL,
+    tkDefaultPackage];
+end;
+
 procedure TSyn1CSyn.Next;
 begin
   fTokenPos := Run;
@@ -721,6 +695,11 @@ begin
   fRange := TRangeState(Value);
 end;
 
+function TSyn1CSyn.IsFilterStored: Boolean;
+begin
+  Result := fDefaultFilter <> SYNS_FilterSQL;
+end;
+
 function TSyn1CSyn.IsIdentChar(AChar: WideChar): Boolean;
 begin
   case AChar of
@@ -729,13 +708,15 @@ begin
   end;
 end;
 
-procedure TSyn1CSyn.DoAddKeyword(AKeyword: string; AKind: integer);
-var
-  HashValue: Integer;
+class function TSyn1CSyn.GetLanguageName: string;
 begin
-  AKeyword := AnsiLowerCase(AKeyword);
-  HashValue := HashKey(PWideChar(AKeyword));
-  fKeywords[HashValue] := TSynHashEntry.Create(AKeyword, AKind);
+  Result := SYNS_LangSQL;
+end;
+
+procedure TSyn1CSyn.DoAddKeyword(AKeyword: string; AKind: integer);
+begin
+  if not FKeywords.ContainsKey(AKeyword)
+  then FKeywords.Add(AKeyword, TtkTokenKind(AKind));
 end;
 
 procedure TSyn1CSyn.SetTableNames(const Value: TStrings);
@@ -751,63 +732,38 @@ end;
 procedure TSyn1CSyn.PutTableNamesInKeywordList;
 var
   i: Integer;
-  Entry: TSynHashEntry;
 begin
-  for i := 0 to fTableNames.Count - 1 do begin
-    Entry := fKeywords[HashKey(PWideChar(fTableNames[i]))];
-    while Assigned(Entry) do begin
-      if AnsiLowerCase(Entry.Keyword) = AnsiLowerCase(fTableNames[i])
-      then Break;
-      Entry := Entry.Next;
-    end;
-    if (not Assigned(Entry)) and
-      (not fTableDict.ContainsKey(AnsiLowerCase(fTableNames[i])))
-    then FTableDict.Add(AnsiLowerCase(FTableNames[i]), True);
-  end;
+  for i := 0 to fTableNames.Count - 1 do
+    if not FKeywords.ContainsKey(fTableNames[i])
+	  then FKeywords.Add(fTableNames[i], tkTableName);
 end;
 
 procedure TSyn1CSyn.PutFunctionNamesInKeywordList;
 var
   i: Integer;
-  Entry: TSynHashEntry;
 begin
-  for i := 0 to (fFunctionNames.Count - 1) do begin
-    Entry := fKeywords[HashKey(PWideChar(fFunctionNames[i]))];
-    while Assigned(Entry) do begin
-      if AnsiLowerCase(Entry.Keyword) = AnsiLowerCase(fFunctionNames[i])
-      then Break;
-      Entry := Entry.Next;
-    end;
-    if not Assigned(Entry)
-    then DoAddKeyword(fFunctionNames[i], Ord(tkFunction));
-  end;
+  for i := 0 to (fFunctionNames.Count - 1) do
+    if not FKeywords.ContainsKey(fFunctionNames[i])
+	  then FKeywords.Add(fFunctionNames[i], tkFunction);
 end;
 
 procedure TSyn1CSyn.PutProcNamesInKeywordList;
 var
   i: Integer;
-  Entry: TSynHashEntry;
 begin
-  for i := 0 to fProcNames.Count - 1 do begin
-    Entry := fKeywords[HashKey(PWideChar(FProcNames[i]))];
-    while Assigned(Entry) do begin
-      if AnsiLowerCase(Entry.Keyword) = AnsiLowerCase(FProcNames[i])
-      then Break;
-      Entry := Entry.Next;
-    end;
-    if not Assigned(Entry) then DoAddKeyword(fProcNames[i], Ord(tkProcName));
-  end;
+  for i := 0 to (fProcNames.Count - 1) do
+    if not FKeywords.ContainsKey(fProcNames[i])
+	  then FKeywords.Add(fProcNames[i], tkProcName);
 end;
 
 procedure TSyn1CSyn.InitializeKeywordLists;
 var
   I: Integer;
 begin
-  fKeywords.Clear;
-  fTableDict.Clear;
+  FKeywords.Clear;
   fToIdent := nil;
   for I := 0 to Ord(High(TtkTokenKind))
-  do EnumerateKeywords(I, GetKeywords(I), IsIdentChar, DoAddKeyword);
+    do EnumerateKeywords(I, GetKeywords(I), IsIdentChar, DoAddKeyword);
   PutProcNamesInKeywordList;
   PutTableNamesInKeywordList;
   PutFunctionNamesInKeywordList;
@@ -822,6 +778,11 @@ end;
 procedure TSyn1CSyn.SetProcNames(const Value: TStrings);
 begin
   fProcNames.Assign(Value);
+end;
+
+class function TSyn1CSyn.GetFriendlyLanguageName: string;
+begin
+  Result := SYNS_FriendlyLangSQL;
 end;
 
 function TSyn1CSyn.GetKeyWords(TokenKind: Integer): string;
