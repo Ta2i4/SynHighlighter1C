@@ -19,7 +19,7 @@ Unicode translation by Maël Hörz.
 
 This code based on SynHighlighterSQL.pas code, by Alexey Tatuyko (2022).
 Code has written and tested on Delphi 10.4 (Seattle) Community Edition.
-File version: v.0.2.1.0 (2022/02/24)
+File version: v.0.2.2.0 (2022/03/04)
 
 All Rights Reserved.
 }
@@ -31,10 +31,13 @@ unit SynHighlighter1C;
 interface
 
 uses
-  System.Generics.Collections, System.SysUtils, System.Classes,
+  System.SysUtils,
+  System.Classes,
   System.Generics.Defaults,
+  System.Generics.Collections,
   Vcl.Graphics,
-  SynEditTypes, SynEditHighlighter;
+  SynEditTypes,
+  SynEditHighlighter;
 
 type
   TtkTokenKind = (tkComment, tkDatatype, tkDefaultPackage, tkException,
@@ -42,8 +45,7 @@ type
     tkSQLPlus, tkString, tkSymbol, tkTableName, tkUnknown, tkVariable,
     tkConditionalComment, tkDelimitedIdentifier, tkProcName, tkConsoleOutput);
 
-  TRangeState = (rsUnknown, rsComment, rsString, rsConditionalComment,
-    rsConsoleOutput);
+  TRangeState = (rsUnknown, rsComment, rsString, rsConditionalComment, rsConsoleOutput);
 
 type
   TSyn1CSyn = class(TSynCustomHighlighter)
@@ -74,6 +76,16 @@ type
     fProcNameAttri: TSynHighlighterAttributes;
     fVariableAttri: TSynHighlighterAttributes;
     function IdentKind(MayBe: PWideChar): TtkTokenKind;
+    procedure DoAddKeyword(AKeyword: string; AKind: integer);
+    procedure SetTableNames(const Value: TStrings);
+    procedure SetFunctionNames(const Value: TStrings);
+    procedure PutFunctionNamesInKeywordList;
+    procedure FunctionNamesChanged(Sender: TObject);
+    procedure ProcNamesChanged(Sender: TObject);
+    procedure TableNamesChanged(Sender: TObject);
+    procedure InitializeKeywordLists;
+    procedure PutProcNamesInKeywordList;
+    procedure PutTableNamesInKeywordList;
     procedure AndSymbolProc;
     procedure AsciiCharProc;
     procedure CRProc;
@@ -84,12 +96,10 @@ type
     procedure LowerProc;
     procedure MinusProc;
     procedure HashProc;
+    procedure NullProc;
     procedure NumberProc;
     procedure OrSymbolProc;
-    procedure NullProc;
     procedure PlusProc;
-    procedure ProcNamesChanged(Sender: TObject);
-    procedure FunctionNamesChanged(Sender: TObject);
     procedure SlashProc;
     procedure SpaceProc;
     procedure QuoteProc;
@@ -100,14 +110,6 @@ type
     procedure VariableProc;
     procedure UnknownProc;
     procedure AnsiCProc;
-    procedure DoAddKeyword(AKeyword: string; AKind: integer);
-    procedure SetTableNames(const Value: TStrings);
-    procedure TableNamesChanged(Sender: TObject);
-    procedure PutTableNamesInKeywordList;
-    procedure InitializeKeywordLists;
-    procedure PutFunctionNamesInKeywordList;
-    procedure PutProcNamesInKeywordList;
-    procedure SetFunctionNames(const Value: TStrings);
     procedure SetProcNames(const Value: TStrings);
   protected
     function IsFilterStored: Boolean; override;
@@ -118,19 +120,19 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
-    procedure Next; override;
     function GetDefaultAttribute(Index: Integer): TSynHighlighterAttributes;
       override;
     function GetEol: Boolean; override;
+    function GetKeyWords(TokenKind: Integer): string; override;
     function GetRange: Pointer; override;
     function GetTokenAttribute: TSynHighlighterAttributes; override;
     function GetTokenID: TtkTokenKind;
     function GetTokenKind: Integer; override;
+    function IsIdentChar(AChar: WideChar): Boolean; override;
     function IsKeyword(const AKeyword: string): Boolean; override;
+    procedure Next; override;
     procedure ResetRange; override;
     procedure SetRange(Value: Pointer); override;
-    function IsIdentChar(AChar: WideChar): Boolean; override;
-    function GetKeyWords(TokenKind: Integer): string; override;
   published
     property CommentAttri: TSynHighlighterAttributes read fCommentAttri
       write fCommentAttri;
@@ -198,96 +200,88 @@ const
 
 function TSyn1CSyn.IdentKind(MayBe: PWideChar): TtkTokenKind;
 var
-  S: String;
+  S: string;
 begin
   fToIdent := MayBe;
-  while IsIdentChar(MayBe^) do begin
-    if (MayBe^ = '-') and ((MayBe + 1)^ = '-') then Break;
+  while IsIdentChar(MayBe^) do
+  begin
+    if (MayBe^ = '-') and ((MayBe + 1)^ = '-') then
+      Break;
     Inc(Maybe);
   end;
   fStringLen := Maybe - fToIdent;
+  if FScanningToEOL then
+    Exit(tkIdentifier);
   SetString(S, fToIdent, fStringLen);
-  if FKeywords.ContainsKey(S) then Result := FKeywords[S] 
-    else Result := tkIdentifier;
+  if not FKeywords.TryGetValue(S, Result) then
+    Result := tkIdentifier;
 end;
 
 constructor TSyn1CSyn.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+
   fCaseSensitive := False;
-  FKeywords := TDictionary<String, TtkTokenKind>.Create(TIStringComparer.Ordinal);
+
+  FKeywords := TDictionary<string, TtkTokenKind>.Create;
+
   FProcNames := TStringList.Create;
   TStringList(FProcNames).OnChange := ProcNamesChanged;
+
   fTableNames := TStringList.Create;
   TStringList(fTableNames).OnChange := TableNamesChanged;
+
   fFunctionNames := TStringList.Create;
   TStringList(fFunctionNames).OnChange := FunctionNamesChanged;
-  fCommentAttri := TSynHighlighterAttributes.Create(SYNS_AttrComment,
-    SYNS_FriendlyAttrComment);
+
+  fCommentAttri := TSynHighlighterAttributes.Create(SYNS_AttrComment, SYNS_FriendlyAttrComment);
   fCommentAttri.Style := [fsItalic];
   AddAttribute(fCommentAttri);
-  fConditionalCommentAttri := TSynHighlighterAttributes.Create(
-    SYNS_AttrConditionalComment, SYNS_FriendlyAttrConditionalComment);
+  fConditionalCommentAttri := TSynHighlighterAttributes.Create(SYNS_AttrConditionalComment, SYNS_FriendlyAttrConditionalComment);
   fConditionalCommentAttri.Style := [fsItalic];
   AddAttribute(fConditionalCommentAttri);
-  fConsoleOutputAttri := TSynHighlighterAttributes.Create(
-    SYNS_AttrConsoleOutput, SYNS_FriendlyAttrConsoleOutput);
+  fConsoleOutputAttri := TSynHighlighterAttributes.Create(SYNS_AttrConsoleOutput, SYNS_FriendlyAttrConsoleOutput);
   fConsoleOutputAttri.Style := [fsBold, fsUnderline];
   AddAttribute(fConsoleOutputAttri);
-  fDataTypeAttri := TSynHighlighterAttributes.Create(SYNS_AttrDataType,
-    SYNS_FriendlyAttrDataType);
+  fDataTypeAttri := TSynHighlighterAttributes.Create(SYNS_AttrDataType, SYNS_FriendlyAttrDataType);
   fDataTypeAttri.Style := [fsBold];
   AddAttribute(fDataTypeAttri);
-  fDefaultPackageAttri := TSynHighlighterAttributes.Create(
-    SYNS_AttrDefaultPackage, SYNS_FriendlyAttrDefaultPackage);
+  fDefaultPackageAttri :=
+    TSynHighlighterAttributes.Create(SYNS_AttrDefaultPackage, SYNS_FriendlyAttrDefaultPackage);
   fDefaultPackageAttri.Style := [fsBold];
   AddAttribute(fDefaultPackageAttri);
-  fDelimitedIdentifierAttri := TSynHighlighterAttributes.Create(
-    SYNS_AttrDelimitedIdentifier, SYNS_FriendlyAttrDelimitedIdentifier);
+  fDelimitedIdentifierAttri := TSynHighlighterAttributes.Create(SYNS_AttrDelimitedIdentifier, SYNS_FriendlyAttrDelimitedIdentifier);
   AddAttribute(fDelimitedIdentifierAttri);
-  fExceptionAttri := TSynHighlighterAttributes.Create(SYNS_AttrException,
-    SYNS_FriendlyAttrException);
+  fExceptionAttri := TSynHighlighterAttributes.Create(SYNS_AttrException, SYNS_FriendlyAttrException);
   fExceptionAttri.Style := [fsItalic];
   AddAttribute(fExceptionAttri);
-  fFunctionAttri := TSynHighlighterAttributes.Create(SYNS_AttrFunction,
-    SYNS_FriendlyAttrFunction);
+  fFunctionAttri := TSynHighlighterAttributes.Create(SYNS_AttrFunction, SYNS_FriendlyAttrFunction);
   fFunctionAttri.Style := [fsBold];
   AddAttribute(fFunctionAttri);
-  fIdentifierAttri := TSynHighlighterAttributes.Create(SYNS_AttrIdentifier,
-    SYNS_FriendlyAttrIdentifier);
+  fIdentifierAttri := TSynHighlighterAttributes.Create(SYNS_AttrIdentifier, SYNS_FriendlyAttrIdentifier);
   AddAttribute(fIdentifierAttri);
-  fKeyAttri := TSynHighlighterAttributes.Create(SYNS_AttrKey,
-    SYNS_FriendlyAttrKey);
+  fKeyAttri := TSynHighlighterAttributes.Create(SYNS_AttrKey, SYNS_FriendlyAttrKey);
   fKeyAttri.Style := [fsBold];
   AddAttribute(fKeyAttri);
-  fNumberAttri := TSynHighlighterAttributes.Create(SYNS_AttrNumber,
-    SYNS_FriendlyAttrNumber);
+  fNumberAttri := TSynHighlighterAttributes.Create(SYNS_AttrNumber, SYNS_FriendlyAttrNumber);
   AddAttribute(fNumberAttri);
-  fPLSQLAttri := TSynHighlighterAttributes.Create(SYNS_AttrPLSQL,
-    SYNS_FriendlyAttrPLSQL);
+  fPLSQLAttri := TSynHighlighterAttributes.Create(SYNS_AttrPLSQL, SYNS_FriendlyAttrPLSQL);
   fPLSQLAttri.Style := [fsBold];
   AddAttribute(fPLSQLAttri);
-  fSpaceAttri := TSynHighlighterAttributes.Create(SYNS_AttrSpace,
-    SYNS_FriendlyAttrSpace);
+  fSpaceAttri := TSynHighlighterAttributes.Create(SYNS_AttrSpace, SYNS_FriendlyAttrSpace);
   AddAttribute(fSpaceAttri);
-  fSQLPlusAttri:=TSynHighlighterAttributes.Create(SYNS_AttrSQLPlus,
-    SYNS_FriendlyAttrSQLPlus);
+  fSQLPlusAttri:=TSynHighlighterAttributes.Create(SYNS_AttrSQLPlus, SYNS_FriendlyAttrSQLPlus);
   fSQLPlusAttri.Style := [fsBold];
   AddAttribute(fSQLPlusAttri);
-  fStringAttri := TSynHighlighterAttributes.Create(SYNS_Attrstring,
-    SYNS_FriendlyAttrstring);
+  fStringAttri := TSynHighlighterAttributes.Create(SYNS_Attrstring, SYNS_FriendlyAttrstring);
   AddAttribute(fStringAttri);
-  fSymbolAttri := TSynHighlighterAttributes.Create(SYNS_AttrSymbol,
-    SYNS_FriendlyAttrSymbol);
+  fSymbolAttri := TSynHighlighterAttributes.Create(SYNS_AttrSymbol, SYNS_FriendlyAttrSymbol);
   AddAttribute(fSymbolAttri);
-  fProcNameAttri := TSynHighlighterAttributes.Create(SYNS_AttrProcName,
-    SYNS_FriendlyAttrProcName);
+  fProcNameAttri := TSynHighlighterAttributes.Create(SYNS_AttrProcName, SYNS_FriendlyAttrProcName);
   AddAttribute(fProcNameAttri);
-  fTableNameAttri := TSynHighlighterAttributes.Create(SYNS_AttrTableName,
-    SYNS_FriendlyAttrTableName);
+  fTableNameAttri := TSynHighlighterAttributes.Create(SYNS_AttrTableName, SYNS_FriendlyAttrTableName);
   AddAttribute(fTableNameAttri);
-  fVariableAttri := TSynHighlighterAttributes.Create(SYNS_AttrVariable,
-    SYNS_FriendlyAttrVariable);
+  fVariableAttri := TSynHighlighterAttributes.Create(SYNS_AttrVariable, SYNS_FriendlyAttrVariable);
   AddAttribute(fVariableAttri);
   SetAttributesOnChange(DefHighlightChange);
   fDefaultFilter := SYNS_FilterSQL;
@@ -318,16 +312,22 @@ end;
 
 procedure TSyn1CSyn.AsciiCharProc;
 begin
-  if fLine[Run] = #0 then NullProc else begin
+  if fLine[Run] = #0 then
+    NullProc
+  else begin
     fTokenID := tkString;
-    if (Run > 0) or (fRange <> rsString) or (fLine[Run] <> #39) then begin
-      fRange := rsString;
-      repeat Inc(Run) until IsLineEnd(Run) or (fLine[Run] = #39);
-    end;
-    if fLine[Run] = #39 then begin
-      Inc(Run);
-      fRange := rsUnknown;
-    end;
+      if (Run > 0) or (fRange <> rsString) or (fLine[Run] <> #39) then
+      begin
+        fRange := rsString;
+        repeat
+          Inc(Run);
+        until IsLineEnd(Run) or (fLine[Run] = #39);
+      end;
+      if fLine[Run] = #39 then
+      begin
+        Inc(Run);
+        fRange := rsUnknown;
+      end;
   end;
 end;
 
@@ -357,7 +357,7 @@ var
   FoundDoubleMinus: Boolean;
 begin
   fTokenID := IdentKind((fLine + Run));
-  Inc(Run, fStringLen);
+  inc(Run, fStringLen);
   if FTokenID in [tkComment, tkConsoleOutput] then
   begin
     while not IsLineEnd(Run) do
@@ -368,14 +368,14 @@ begin
     begin
       FoundDoubleMinus := (fLine[Run] = '-') and (fLine[Run + 1] = '-');
       if FoundDoubleMinus then Break;
-      Inc(Run);
+      inc(Run);
     end;
 end;
 
 procedure TSyn1CSyn.LFProc;
 begin
   fTokenID := tkSpace;
-  Inc(Run);
+  inc(Run);
 end;
 
 procedure TSyn1CSyn.LowerProc;
@@ -394,22 +394,27 @@ end;
 procedure TSyn1CSyn.MinusProc;
 begin
   Inc(Run);
-  if (fLine[Run] = '-') then begin
+  if (fLine[Run] = '-') then
+  begin
     fTokenID := tkComment;
-    repeat Inc(Run) until IsLineEnd(Run);
-  end else fTokenID := tkSymbol;
+    repeat
+      Inc(Run);
+    until IsLineEnd(Run);
+  end
+  else
+    fTokenID := tkSymbol;
 end;
 
 procedure TSyn1CSyn.HashProc;
 begin
-  Inc(Run);
-  fTokenID := tkUnknown;
+    Inc(Run);
+    fTokenID := tkUnknown;
 end;
 
 procedure TSyn1CSyn.NullProc;
 begin
   fTokenID := tkNull;
-  Inc(Run);
+  inc(Run);
 end;
 
 procedure TSyn1CSyn.NumberProc;
@@ -417,17 +422,24 @@ procedure TSyn1CSyn.NumberProc;
   function IsNumberChar: Boolean;
   begin
     case fLine[Run] of
-      '0'..'9', '.', '-': Result := True;
-      else Result := False;
+      '0'..'9', '.', '-':
+        Result := True;
+      else
+        Result := False;
     end;
   end;
 
 begin
-  Inc(Run);
+  inc(Run);
   fTokenID := tkNumber;
-  while IsNumberChar do begin
-    if (FLine[Run] = '.') and (FLine[Run + 1] = '.') then Break;
-    Inc(Run);
+  while IsNumberChar do
+  begin
+    case FLine[Run] of
+      '.':
+        if FLine[Run + 1] = '.' then
+          Break;
+    end;
+    inc(Run);
   end;
 end;
 
@@ -461,14 +473,14 @@ begin
   case fLine[Run] of
     '*':
       begin
-        fRange := rsComment;
-        fTokenID := tkComment;
+          fRange := rsComment;
+          fTokenID := tkComment;
         repeat
           Inc(Run);
           if (fLine[Run] = '*') and (fLine[Run + 1] = '/') then begin
             fRange := rsUnknown;
             Inc(Run, 2);
-            Break;
+            break;
           end;
         until IsLineEnd(Run);
       end;
@@ -477,13 +489,14 @@ begin
         Inc(Run);
         fTokenID := tkSymbol;
       end;
-    else fTokenID := tkSymbol;
+    else
+      fTokenID := tkSymbol;
   end;
 end;
 
 procedure TSyn1CSyn.SpaceProc;
 begin
-  Inc(Run);
+  inc(Run);
   fTokenID := tkSpace;
   while (FLine[Run] <= #32) and not IsLineEnd(Run) do inc(Run);
 end;
@@ -492,10 +505,13 @@ procedure TSyn1CSyn.QuoteProc;
 begin
   fTokenID := tkDelimitedIdentifier;
   Inc(Run);
-  while not IsLineEnd(Run) do begin
-    if fLine[Run] = #34 then begin
+  while not IsLineEnd(Run) do
+  begin
+    if fLine[Run] = #34 then
+    begin
       Inc(Run);
-      if fLine[Run] <> #34 then Break;
+      if fLine[Run] <> #34 then
+        Break;
     end;
     Inc(Run);
   end;
@@ -503,21 +519,24 @@ end;
 
 procedure TSyn1CSyn.BacktickProc;
 begin
-  Inc(Run);
-  fTokenID := tkUnknown;
+    Inc(Run);
+    fTokenID := tkUnknown;
 end;
 
 procedure TSyn1CSyn.BracketProc;
 begin
-  fTokenID := tkDelimitedIdentifier;
-  Inc(Run);
-  while not IsLineEnd(Run) do begin
-    if fLine[Run] = ']' then begin
-      Inc(Run);
-      if fLine[Run] <> ']' then Break;
-    end;
+    fTokenID := tkDelimitedIdentifier;
     Inc(Run);
-  end;
+    while not IsLineEnd(Run) do
+    begin
+      if fLine[Run] = ']' then
+      begin
+        Inc(Run);
+        if fLine[Run] <> ']' then
+          Break;
+      end;
+      Inc(Run);
+    end;
 end;
 
 procedure TSyn1CSyn.SymbolProc;
@@ -535,12 +554,15 @@ end;
 
 procedure TSyn1CSyn.VariableProc;
 var
-  i: Integer;
+  i: integer;
   FoundDoubleMinus: Boolean;
 begin
   if (fLine[Run] = '@') and (fLine[Run + 1] = '@') then
     IdentProc
-  else begin
+  else if (fLine[Run] = ':') then
+    SymbolProc
+  else
+  begin
     fTokenID := tkVariable;
     i := Run;
     repeat
@@ -564,11 +586,15 @@ begin
      #0: NullProc;
     #10: LFProc;
     #13: CRProc;
-    else begin
-      if fRange = rsConditionalComment then fTokenID := tkConditionalComment
-      else fTokenID := tkComment;
+    else
+    begin
+      if fRange = rsConditionalComment then
+        fTokenID := tkConditionalComment
+      else
+        fTokenID := tkComment;
       repeat
-        if (fLine[Run] = '*') and (fLine[Run + 1] = '/') then begin
+        if (fLine[Run] = '*') and (fLine[Run + 1] = '/') then
+        begin
           fRange := rsUnknown;
           Inc(Run, 2);
           Break;
@@ -582,20 +608,33 @@ end;
 function TSyn1CSyn.IsKeyword(const AKeyword: string): Boolean;
 var
   tk: TtkTokenKind;
+  S: string;
 begin
-  tk := IdentKind(PWideChar(AKeyword));
-  Result := tk in [tkDatatype, tkException, tkFunction, tkKey, tkPLSQL,
-    tkDefaultPackage];
+  if not fCaseSensitive then
+    S := AnsiLowerCase(AKeyword)
+  else
+    S := AKeyword;
+  if not FKeywords.TryGetValue(S, tk) then
+    tk := tkUnknown;
+  Result := tk in
+    [tkDatatype, tkException, tkFunction, tkKey, tkPLSQL, tkDefaultPackage];
 end;
 
 procedure TSyn1CSyn.Next;
 begin
   fTokenPos := Run;
   case fRange of
-    rsComment, rsConditionalComment: AnsiCProc;
-    rsConsoleOutput: while not IsLineEnd(Run) do Inc(Run);
-    rsString: AsciiCharProc;
-    else case fLine[Run] of
+    rsComment, rsConditionalComment:
+      AnsiCProc;
+    rsConsoleOutput:
+      begin
+        while not IsLineEnd(Run) do
+          Inc(Run);
+      end;
+    rsString:
+      AsciiCharProc;
+  else
+    case fLine[Run] of
       #0: NullProc;
       #10: LFProc;
       #13: CRProc;
@@ -634,7 +673,8 @@ begin
     SYN_ATTR_STRING: Result := fStringAttri;
     SYN_ATTR_WHITESPACE: Result := fSpaceAttri;
     SYN_ATTR_SYMBOL: Result := fSymbolAttri;
-    else Result := nil;
+  else
+    Result := nil;
   end;
 end;
 
@@ -676,7 +716,8 @@ begin
     tkTableName: Result := fTableNameAttri;
     tkVariable: Result := fVariableAttri;
     tkUnknown: Result := fIdentifierAttri;
-    else Result := nil;
+  else
+    Result := nil;
   end;
 end;
 
@@ -703,8 +744,10 @@ end;
 function TSyn1CSyn.IsIdentChar(AChar: WideChar): Boolean;
 begin
   case AChar of
-    'a'..'z', 'A'..'Z', 'а'..'я', 'А'..'Я', '0'..'9', '_', '@': Result := True;
-    else Result := False;
+    'a'..'z', 'A'..'Z', 'а'..'я', 'А'..'Я', '0'..'9', '_', '@':
+      Result := True;
+    else
+      Result := False;
   end;
 end;
 
@@ -713,10 +756,13 @@ begin
   Result := SYNS_LangSQL;
 end;
 
-procedure TSyn1CSyn.DoAddKeyword(AKeyword: string; AKind: integer);
+procedure TSynSQLSyn.DoAddKeyword(AKeyword: string; AKind: integer);
+var
+  S: string;
 begin
-  if not FKeywords.ContainsKey(AKeyword)
-  then FKeywords.Add(AKeyword, TtkTokenKind(AKind));
+  S := AnsiLowerCase(AKeyword);
+  if not FKeywords.ContainsKey(S) then
+    FKeywords.Add(S, TtkTokenKind(AKind));
 end;
 
 procedure TSyn1CSyn.SetTableNames(const Value: TStrings);
@@ -732,28 +778,40 @@ end;
 procedure TSyn1CSyn.PutTableNamesInKeywordList;
 var
   i: Integer;
+  S: string;
 begin
   for i := 0 to fTableNames.Count - 1 do
-    if not FKeywords.ContainsKey(fTableNames[i])
-	  then FKeywords.Add(fTableNames[i], tkTableName);
+  begin
+    S := AnsiLowerCase(fTableNames[i]);
+    if not FKeywords.ContainsKey(S) then
+      FKeywords.Add(S, tkTableName);
+  end;
 end;
 
 procedure TSyn1CSyn.PutFunctionNamesInKeywordList;
 var
   i: Integer;
+  S: string;
 begin
   for i := 0 to (fFunctionNames.Count - 1) do
-    if not FKeywords.ContainsKey(fFunctionNames[i])
-	  then FKeywords.Add(fFunctionNames[i], tkFunction);
+  begin
+    S := AnsiLowerCase(fFunctionNames[i]);
+    if not FKeywords.ContainsKey(S) then
+      FKeywords.Add(S, tkFunction);
+  end;
 end;
 
 procedure TSyn1CSyn.PutProcNamesInKeywordList;
 var
   i: Integer;
+  S: string;
 begin
   for i := 0 to (fProcNames.Count - 1) do
-    if not FKeywords.ContainsKey(fProcNames[i])
-	  then FKeywords.Add(fProcNames[i], tkProcName);
+  begin
+    S := AnsiLowerCase(fProcNames[i]);
+    if not FKeywords.ContainsKey(S) then
+      FKeywords.Add(S, tkProcName);
+  end;
 end;
 
 procedure TSyn1CSyn.InitializeKeywordLists;
@@ -762,8 +820,10 @@ var
 begin
   FKeywords.Clear;
   fToIdent := nil;
-  for I := 0 to Ord(High(TtkTokenKind))
-    do EnumerateKeywords(I, GetKeywords(I), IsIdentChar, DoAddKeyword);
+
+  for I := 0 to Ord(High(TtkTokenKind)) do
+    EnumerateKeywords(I, GetKeywords(I), IsIdentChar, DoAddKeyword);
+
   PutProcNamesInKeywordList;
   PutTableNamesInKeywordList;
   PutFunctionNamesInKeywordList;
@@ -788,14 +848,13 @@ end;
 function TSyn1CSyn.GetKeyWords(TokenKind: Integer): string;
 begin
   Result := '';
-  case TtkTokenKind(TokenKind) of
-    tkKey: Result := ONESKW;
-    tkDataType: Result := ONESTypes;
-    tkFunction: Result := ONESFunctions;
-  end;
+      case TtkTokenKind(TokenKind) of
+        tkKey: Result := ONESKW;
+        tkDataType: Result := ONESTypes;
+        tkFunction: Result := ONESFunctions;
+      end;
 end;
 
 initialization
   RegisterPlaceableHighlighter(TSyn1CSyn);
-
 end.
